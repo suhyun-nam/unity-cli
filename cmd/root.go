@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/youngwoocho02/unity-cli/internal/client"
+	"github.com/suhyun-nam/unity-cli/internal/client"
 )
 
 // Version은 릴리스 빌드에서 -X main.Version로 주입된다. 소스 기본값 dev는 버전 검사를 건너뛴다.
@@ -829,17 +829,17 @@ Rules:
 
 CLI Installation:
   # Linux / macOS
-  curl -fsSL https://raw.githubusercontent.com/youngwoocho02/unity-cli/master/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/suhyun-nam/unity-cli/main/install.sh | sh
 
   # Windows (PowerShell)
-  irm https://raw.githubusercontent.com/youngwoocho02/unity-cli/master/install.ps1 | iex
+  irm https://raw.githubusercontent.com/suhyun-nam/unity-cli/main/install.ps1 | iex
 
   # Go install (any platform)
-  go install github.com/youngwoocho02/unity-cli@latest
+  go install github.com/suhyun-nam/unity-cli@latest
 
 Unity Setup:
   1. Window → Package Manager → + → Add package from git URL
-  2. Paste: https://github.com/youngwoocho02/unity-cli.git?path=unity-connector
+  2. Paste: https://github.com/suhyun-nam/unity-cli.git?path=unity-connector
   The Connector starts automatically when Unity opens.
 
 Verify:
