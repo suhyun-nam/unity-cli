@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/youngwoocho02/unity-cli/internal/client"
+	"github.com/suhyun-nam/unity-cli/internal/client"
 )
 
 func unusedSend(t *testing.T) sendFn {

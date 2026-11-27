@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/youngwoocho02/unity-cli/internal/client"
+	"github.com/suhyun-nam/unity-cli/internal/client"
 )
 
 // editorCmd는 play/stop/pause/refresh를 커넥터 도구로 보낸다.

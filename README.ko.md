@@ -6,6 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+> **Fork 안내:** 이 저장소는 [youngwoocho02/unity-cli](https://github.com/youngwoocho02/unity-cli)에 버그 수정을 더해 관리하는 fork입니다. 아래 설치 URL, `unity-cli update`, Unity 패키지 URL은 이 fork를 가리킵니다. Unity 패키지 이름(`com.youngwoocho02.unity-cli-connector`)은 그대로라서, 기존 프로젝트는 패키지 URL만 바꾸면 됩니다.
+
 **서버 실행 없음. 설정 파일 없음. 프로세스 관리 없음. 명령어만 치면 됩니다.**
 
 ## 왜 만들었나
@@ -25,24 +27,24 @@ CLI 전체가 Go ~800줄(+ help text ~300줄), Unity 커넥터가 C# ~2,300줄�
 ### Linux / macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/youngwoocho02/unity-cli/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/suhyun-nam/unity-cli/main/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/youngwoocho02/unity-cli/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/suhyun-nam/unity-cli/main/install.ps1 | iex
 ```
 
 ### 기타 방법
 
 ```bash
 # Go install (Go가 설치된 모든 플랫폼)
-go install github.com/youngwoocho02/unity-cli@latest
+go install github.com/suhyun-nam/unity-cli@latest
 
 # 수동 다운로드 (플랫폼 선택)
 # Linux amd64 / Linux arm64 / macOS amd64 / macOS arm64 / Windows amd64
-curl -fsSL https://github.com/youngwoocho02/unity-cli/releases/latest/download/unity-cli-linux-amd64 -o unity-cli
+curl -fsSL https://github.com/suhyun-nam/unity-cli/releases/latest/download/unity-cli-linux-amd64 -o unity-cli
 chmod +x unity-cli && sudo mv unity-cli /usr/local/bin/
 ```
 
@@ -63,12 +65,12 @@ unity-cli update --check
 **Package Manager → Add package from git URL**에서 추가:
 
 ```
-https://github.com/youngwoocho02/unity-cli.git?path=unity-connector
+https://github.com/suhyun-nam/unity-cli.git?path=unity-connector
 ```
 
 또는 `Packages/manifest.json`에 직접 추가:
 ```json
-"com.youngwoocho02.unity-cli-connector": "https://github.com/youngwoocho02/unity-cli.git?path=unity-connector"
+"com.youngwoocho02.unity-cli-connector": "https://github.com/suhyun-nam/unity-cli.git?path=unity-connector"
 ```
 
 특정 버전을 고정하려면 URL 끝에 태그를 추가하세요 (예: `#v0.2.21`).
