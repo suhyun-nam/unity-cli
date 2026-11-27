@@ -13,8 +13,16 @@ namespace UnityCliConnector.TestRunner
     [UnityCliTool(Description = "Run Unity EditMode or PlayMode tests and return results.")]
     public static class RunTests
     {
-        internal static readonly string StatusDir = Path.Combine(
+        static readonly string s_StatusRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".unity-cli", "status");
+
+        /// <summary>
+        /// ~/.unity-cli/status/&lt;projectKey&gt;/. 이 에디터의 PlayMode 대기·결과 파일만 둔다.
+        /// 에디터 여러 개가 status 한 폴더를 같이 쓰면, 리로드한 에디터가 남의 대기 파일에
+        /// 콜백을 다시 걸어 자기 결과를 남의 실행 ID로 써 버린다. 폴더를 나눠 처음부터 보지 않게 한다.
+        /// CLI는 이 경로를 계산하지 않고 "running" 응답의 resultsPath를 그대로 기다린다.
+        /// </summary>
+        internal static string ProjectStatusDir => Path.Combine(s_StatusRoot, Heartbeat.ProjectKey);
 
         public class Parameters
         {
@@ -55,7 +63,8 @@ namespace UnityCliConnector.TestRunner
 
             var runId = p.Get("runId", Guid.NewGuid().ToString("N"));
             StartPlayModeRun(filter, runId);
-            return Task.FromResult<object>(new SuccessResponse("running", new { runId }));
+            // resultsPath: CLI가 폴링할 파일. 프로젝트별 폴더 위치는 커넥터만 안다.
+            return Task.FromResult<object>(new SuccessResponse("running", new { runId, resultsPath = ResultsFilePath(runId) }));
         }
 
         private static Task<object> ExecuteInProcess(TestMode mode, string filter)
@@ -141,7 +150,7 @@ namespace UnityCliConnector.TestRunner
 
             try
             {
-                Directory.CreateDirectory(StatusDir);
+                Directory.CreateDirectory(ProjectStatusDir);
                 File.WriteAllText(ResultsFilePath(runId), JsonConvert.SerializeObject(data));
             }
             catch (Exception ex)
@@ -151,7 +160,7 @@ namespace UnityCliConnector.TestRunner
         }
 
         internal static string ResultsFilePath(string runId) =>
-            Path.Combine(StatusDir, $"test-results-{runId}.json");
+            Path.Combine(ProjectStatusDir, $"test-results-{runId}.json");
 
         internal static object BuildResponse(List<string> passed, List<string> failed, List<string> skipped)
         {
