@@ -72,6 +72,11 @@ func testCmd(args []string, send sendFn, resolve instanceResolver) (*client.Comm
 		return resp, nil
 	}
 
+	resultsPath, err := playModeResultsPath(resp, runID)
+	if err != nil {
+		return nil, err
+	}
+
 	fmt.Fprintln(os.Stderr, "PlayMode tests running, waiting for results...")
 
 	// Suppress "Unsolicited response received on idle HTTP channel" during domain reload
@@ -79,7 +84,43 @@ func testCmd(args []string, send sendFn, resolve instanceResolver) (*client.Comm
 	log.SetOutput(&suppressWriter{w: os.Stderr, suppress: "Unsolicited response received on idle HTTP channel"})
 	defer log.SetOutput(original)
 
-	return pollTestResults(runID, resolve)
+	return pollTestResults(resultsPath, resolve)
+}
+
+// playModeResultsPath는 "running" 응답에서 커넥터가 결과를 쓸 파일 경로를 꺼낸다.
+// 경로는 ~/.unity-cli/status/<projectKey>/test-results-<runId>.json이고, 프로젝트별 폴더라
+// 다른 에디터의 결과가 이 파일에 써지지 않는다. CLI는 projectKey를 직접 계산하지 않는다
+// (커넥터와 경로 표기가 달라 어긋날 수 있다).
+// 읽은 뒤 지우는 파일이라, 이번 runId의 결과 파일이고 status 폴더 안일 때만 받는다.
+func playModeResultsPath(resp *client.CommandResponse, runID string) (string, error) {
+	var data struct {
+		RunID       string `json:"runId"`
+		ResultsPath string `json:"resultsPath"`
+	}
+	if len(resp.Data) > 0 {
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			return "", fmt.Errorf("invalid PlayMode test response: %w", err)
+		}
+	}
+	if data.ResultsPath == "" {
+		return "", fmt.Errorf("connector did not return a test results path; update the Unity CLI Connector package")
+	}
+	if data.RunID != runID {
+		return "", fmt.Errorf("connector returned run id %q, want %q", data.RunID, runID)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	statusRoot := filepath.Join(home, ".unity-cli", "status")
+	path := filepath.Clean(data.ResultsPath)
+	rel, err := filepath.Rel(statusRoot, path)
+	if err != nil || !filepath.IsAbs(path) || rel == "." || strings.HasPrefix(rel, "..") ||
+		filepath.Base(path) != fmt.Sprintf("test-results-%s.json", runID) {
+		return "", fmt.Errorf("unexpected test results path from connector: %s", data.ResultsPath)
+	}
+	return path, nil
 }
 
 // newTestRunID는 이번 실행 전용 파일 이름에 쓰는 식별자다.
@@ -94,15 +135,9 @@ var (
 	testResultsGoneGrace = 30 * time.Second
 )
 
-// pollTestResults는 ~/.unity-cli/status/test-results-<id>.json이 생길 때까지 기다린다.
+// pollTestResults는 커넥터가 알려 준 resultsPath 파일이 생길 때까지 기다리고, 읽은 뒤 지운다.
 // resolve 실패는 리로드일 수 있어 goneGrace 동안은 계속 폴링한다. 초를 짐작해 끝내지 않는다.
-func pollTestResults(runID string, resolve instanceResolver) (*client.CommandResponse, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("cannot determine home directory: %w", err)
-	}
-
-	resultsPath := filepath.Join(home, ".unity-cli", "status", fmt.Sprintf("test-results-%s.json", runID))
+func pollTestResults(resultsPath string, resolve instanceResolver) (*client.CommandResponse, error) {
 	deadline := time.Now().Add(testResultsPollTimeout)
 	var goneSince time.Time
 

@@ -34,6 +34,11 @@ namespace UnityCliConnector
 
         static Heartbeat()
         {
+            // Asset Import Worker도 에디터 어셈블리를 올리지만 명령을 받는 에디터가 아니다.
+            // 같은 프로젝트 경로라 같은 인스턴스 파일을 자기 PID·포트로 덮어쓰고,
+            // 끝날 때 stopped를 남겨 CLI가 에디터가 꺼졌다고 보게 된다. 그래서 아무것도 하지 않는다.
+            if (AssetDatabase.IsAssetImportWorkerProcess()) return;
+
             // 에디터 틱마다 쓰고, 종료/리로드/플레이 전환 때 상태를 강제한다.
             EditorApplication.update += Tick;
             EditorApplication.quitting += Cleanup;
@@ -94,15 +99,32 @@ namespace UnityCliConnector
             Write();
         }
 
+        static string s_ProjectKey;
+
+        /// <summary>
+        /// 프로젝트 경로 MD5 앞 16자리. 인스턴스 파일 이름과 프로젝트별 status 폴더 이름에 같이 쓴다.
+        /// 같은 프로젝트는 항상 같은 값이고, 이름이 같은 다른 경로의 프로젝트와는 겹치지 않는다.
+        /// CLI는 이 값을 직접 계산하지 않는다 (경로 대소문자·슬래시 차이로 어긋날 수 있다).
+        /// 메인 스레드에서 처음 불려야 한다 (Application.dataPath).
+        /// </summary>
+        public static string ProjectKey
+        {
+            get
+            {
+                if (s_ProjectKey != null) return s_ProjectKey;
+                var projectPath = Application.dataPath.Replace("/Assets", "");
+                using var md5 = MD5.Create();
+                s_ProjectKey = BitConverter.ToString(md5.ComputeHash(Encoding.UTF8.GetBytes(projectPath)))
+                    .Replace("-", "").Substring(0, 16).ToLower();
+                return s_ProjectKey;
+            }
+        }
+
         // 프로젝트 경로 해시로 파일 이름을 고정한다. 같은 프로젝트는 항상 같은 파일.
         static string GetFilePath()
         {
             if (s_FilePath != null) return s_FilePath;
-            var projectPath = Application.dataPath.Replace("/Assets", "");
-            using var md5 = MD5.Create();
-            var hash = BitConverter.ToString(md5.ComputeHash(Encoding.UTF8.GetBytes(projectPath)))
-                .Replace("-", "").Substring(0, 16).ToLower();
-            s_FilePath = Path.Combine(s_Dir, $"{hash}.json");
+            s_FilePath = Path.Combine(s_Dir, $"{ProjectKey}.json");
             return s_FilePath;
         }
 

@@ -48,6 +48,10 @@ namespace UnityCliConnector
 
         static HttpServer()
         {
+            // Asset Import Worker에서는 리스너를 열지 않는다. 열면 8090~ 포트 하나를 차지하고,
+            // Heartbeat가 그 포트를 같은 프로젝트의 인스턴스 파일에 써 버린다. (Heartbeat 참고)
+            if (AssetDatabase.IsAssetImportWorkerProcess()) return;
+
             s_MainContext = SynchronizationContext.Current;
             Start();
             // 리로드 전에 리스너를 닫고, 리로드 후 다시 연다. 큐는 메인 스레드 update에서 뺀다.

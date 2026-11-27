@@ -13,12 +13,17 @@ namespace UnityCliConnector.TestRunner
     /// Survives domain reloads via [InitializeOnLoad].
     /// Re-registers TestRunnerApi callbacks after PlayMode domain reload
     /// so RunFinished still fires and results are written to file.
+    /// 대기·결과 파일은 이 프로젝트 폴더(RunTests.ProjectStatusDir)에만 둔다.
     /// </summary>
     [InitializeOnLoad]
     public static class TestRunnerState
     {
         static TestRunnerState()
         {
+            // Asset Import Worker는 테스트를 돌리지 않는다. 같은 프로젝트 폴더의 대기 파일에
+            // 콜백을 걸 이유가 없다.
+            if (AssetDatabase.IsAssetImportWorkerProcess()) return;
+
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
         }
 
@@ -27,7 +32,7 @@ namespace UnityCliConnector.TestRunner
             var pending = new { runId, filter = filter ?? "" };
             try
             {
-                Directory.CreateDirectory(RunTests.StatusDir);
+                Directory.CreateDirectory(RunTests.ProjectStatusDir);
                 File.WriteAllText(PendingFilePath(runId), JsonConvert.SerializeObject(pending));
             }
             catch { }
@@ -43,12 +48,15 @@ namespace UnityCliConnector.TestRunner
             catch { }
         }
 
+        // 리로드 전에 건 콜백은 사라지므로, 이 프로젝트의 대기 파일마다 다시 건다.
+        // 다른 프로젝트 폴더는 보지 않는다. 보면 그 에디터의 실행 ID로 이 에디터의 결과를 쓰게 된다.
         static void OnAfterAssemblyReload()
         {
             try
             {
-                Directory.CreateDirectory(RunTests.StatusDir);
-                foreach (var file in Directory.GetFiles(RunTests.StatusDir, "test-pending-*.json"))
+                var dir = RunTests.ProjectStatusDir;
+                Directory.CreateDirectory(dir);
+                foreach (var file in Directory.GetFiles(dir, "test-pending-*.json"))
                 {
                     var json = File.ReadAllText(file);
                     var pending = JObject.Parse(json);
@@ -84,6 +92,6 @@ namespace UnityCliConnector.TestRunner
         }
 
         static string PendingFilePath(string runId) =>
-            Path.Combine(RunTests.StatusDir, $"test-pending-{runId}.json");
+            Path.Combine(RunTests.ProjectStatusDir, $"test-pending-{runId}.json");
     }
 }
