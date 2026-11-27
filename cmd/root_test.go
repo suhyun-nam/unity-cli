@@ -218,6 +218,70 @@ func TestBuildParams_BaseParams(t *testing.T) {
 	}
 }
 
+// stubPipedStdin은 실제 stdin 대신 쓸 함수를 넣고, 불렸는지 기록한다.
+func stubPipedStdin(t *testing.T, code string, ok bool) *bool {
+	t.Helper()
+	called := false
+	prev := readPipedStdin
+	readPipedStdin = func() (string, bool) {
+		called = true
+		return code, ok
+	}
+	t.Cleanup(func() { readPipedStdin = prev })
+	return &called
+}
+
+// 코드 인자가 있으면 stdin을 읽지 않는다. 닫히지 않는 파이프에서 멈추던 문제 (upstream #38).
+func TestBuildExecParams_CodeArgSkipsStdin(t *testing.T) {
+	cases := map[string][]string{
+		"positional": {"return 1;", "--usings", "Unity.Entities"},
+		"code flag":  {"--code", "return 1;"},
+	}
+	for name, args := range cases {
+		t.Run(name, func(t *testing.T) {
+			called := stubPipedStdin(t, "return 2;", true)
+			params, err := buildExecParams(args)
+			if err != nil {
+				t.Fatalf("buildExecParams returned error: %v", err)
+			}
+			if *called {
+				t.Fatal("stdin must not be read when code is given as an argument")
+			}
+			if got := execCodeFromParams(params); got != "return 1;" {
+				t.Fatalf("code = %q, want return 1;", got)
+			}
+		})
+	}
+}
+
+func TestBuildExecParams_ReadsStdinWithoutCodeArg(t *testing.T) {
+	called := stubPipedStdin(t, "return 2;", true)
+	params, err := buildExecParams([]string{"--usings", "Unity.Entities"})
+	if err != nil {
+		t.Fatalf("buildExecParams returned error: %v", err)
+	}
+	if !*called {
+		t.Fatal("stdin should be read when no code argument is given")
+	}
+	if got := execCodeFromParams(params); got != "return 2;" {
+		t.Fatalf("code = %q, want return 2;", got)
+	}
+	if usings, _ := params["usings"].([]string); len(usings) != 1 || usings[0] != "Unity.Entities" {
+		t.Fatalf("usings = %v, want [Unity.Entities]", params["usings"])
+	}
+}
+
+func TestBuildExecParams_NoCodeAnywhere(t *testing.T) {
+	stubPipedStdin(t, "", false)
+	params, err := buildExecParams(nil)
+	if err != nil {
+		t.Fatalf("buildExecParams returned error: %v", err)
+	}
+	if got := execCodeFromParams(params); got != "" {
+		t.Fatalf("code = %q, want empty", got)
+	}
+}
+
 func TestValidateExecAsyncPolicy_BlocksPositionalAsyncCode(t *testing.T) {
 	params := map[string]interface{}{
 		"args": []string{"await Task.Delay(1); return null;"},

@@ -107,9 +107,8 @@ func Execute() error {
 	case "test":
 		resp, err = testCmd(subArgs, send, resolve)
 	case "exec":
-		subArgs = readStdinIfPiped(subArgs)
 		var params map[string]interface{}
-		params, err = buildParams(subArgs, nil)
+		params, err = buildExecParams(subArgs)
 		if err == nil {
 			err = validateExecAsyncPolicy(params)
 		}
@@ -452,21 +451,38 @@ func rejectRemovedFlags(args []string) error {
 	return nil
 }
 
-// readStdinIfPiped reads stdin when piped and prepends it as the first positional arg.
-func readStdinIfPiped(args []string) []string {
+// buildExecParams는 exec 인자로 params를 만든다.
+// 코드가 위치 인자나 --code로 이미 있으면 stdin을 읽지 않는다. 에이전트 셸·CI·ssh처럼
+// stdin이 닫히지 않는 파이프인 환경에서 읽기가 EOF를 기다리며 멈추기 때문이다.
+// 이 읽기는 sendWithRetry 앞이라 --timeout도 걸리지 않는다.
+// 코드가 없을 때만 stdin을 읽어 첫 위치 인자로 넣는다.
+func buildExecParams(args []string) (map[string]interface{}, error) {
+	params, err := buildParams(args, nil)
+	if err != nil || execCodeFromParams(params) != "" {
+		return params, err
+	}
+	code, ok := readPipedStdin()
+	if !ok {
+		return params, nil
+	}
+	return buildParams(append([]string{code}, args...), nil)
+}
+
+// readPipedStdin은 stdin이 파이프·파일일 때 끝까지 읽는다. 터미널이거나 비어 있으면 false.
+// 테스트에서 바꿔 실제 stdin을 읽지 않게 한다.
+var readPipedStdin = func() (string, bool) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
-		return args
+		return "", false
 	}
 	if info.Mode()&os.ModeCharDevice != 0 {
-		return args // interactive terminal, not piped
+		return "", false // interactive terminal, not piped
 	}
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil || len(data) == 0 {
-		return args
+		return "", false
 	}
-	code := strings.TrimRight(string(data), "\n\r")
-	return append([]string{code}, args...)
+	return strings.TrimRight(string(data), "\n\r"), true
 }
 
 // splitArgs separates global flags from subcommand args.
@@ -659,6 +675,7 @@ Examples:
 Stdin:
   Pipe code via stdin to avoid shell escaping issues.
   echo '<code>' | unity-cli exec [--usings ns1,ns2] [--usings ns3]
+  Stdin is read only when no code is given as an argument (positional or --code).
 
 Notes:
   - Use 'return' for output, 'return null;' for void operations
